@@ -9,7 +9,7 @@ type MailOptions = {
 
 export async function sendMail({ to, subject, html, text }: MailOptions) {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.MAIL_FROM;
+  const from = "City Boy Movement Plateau State <cbm@anvil.com.ng>";
   if (!apiKey || !from) {
     throw new Error("RESEND_API_KEY and MAIL_FROM must be set in .env");
   }

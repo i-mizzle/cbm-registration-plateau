@@ -1,22 +1,68 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
-import PropTypes from 'prop-types';
-import PlusIcon from '../icons/PlusIcon';
-import InlinePreloader from '../InlinePreloader';
-import CheckIcon from '../icons/CheckIcon';
-import { useOutsideAlerter } from './SelectField';
-import { debounce } from '../../../../utils/utils';
+import PlusIcon from '../icons/PlusIcon'
+import InlinePreloader from '../InlinePreloader'
+import CheckIcon from '../icons/CheckIcon'
+import { useOutsideAlerter } from './SelectField'
+import { debounce } from '@/lib/debounce'
+
+export type AutocompleteOption = string | ({ description?: string } & Record<string, unknown>)
+
+type ConditionalItemStyling = {
+    conditionTriggerKey: string
+    itemIdentifier: string
+    classes?: string
+    includeButton?: boolean
+    buttonClasses?: string
+    buttonLabel?: string
+    actionProcessed?: boolean
+    itemProcessed?: unknown
+    action: (option: AutocompleteOption) => Promise<void> | void
+}
+
+type AutocompleteSelectProps = {
+    selectOptions: AutocompleteOption[]
+    inputLabel: string
+    placeholderText?: string
+    displayImage?: boolean
+    imageField?: string
+    bgImage?: boolean
+    titleField?: string
+    preSelected?: AutocompleteOption
+    preSelectedLabel?: string
+    hasError?: string | boolean
+    returnFieldValue: (option: AutocompleteOption) => void
+    includeButton?: boolean
+    buttonLabel?: string
+    buttonAction?: () => void
+    disabled?: boolean
+    requiredField?: boolean
+    conditionalItemStyling?: ConditionalItemStyling
+    position?: string
+    disableAutocomplete?: boolean
+    enableSearch?: boolean
+    searchFunction?: (term: string) => void
+    searchInProgress?: boolean
+}
+
+const getField = (option: AutocompleteOption, key?: string): unknown =>
+    key && typeof option !== 'string' ? option[key] : option
+
+const getText = (option: AutocompleteOption, key?: string) => {
+    const value = getField(option, key)
+    return typeof value === 'string' || typeof value === 'number' ? String(value) : ''
+}
 
 const AutocompleteSelect = ({
-    selectOptions, 
-    inputLabel, 
+    selectOptions,
+    inputLabel,
     placeholderText,
-    displayImage, 
-    imageField, 
+    displayImage,
+    imageField,
     bgImage,
-    titleField, 
-    preSelected, 
+    titleField,
+    preSelected,
     preSelectedLabel,
-    hasError, 
+    hasError,
     returnFieldValue,
     includeButton,
     buttonLabel,
@@ -24,14 +70,49 @@ const AutocompleteSelect = ({
     disabled,
     requiredField,
     conditionalItemStyling,
-    position='top-[90px]',
-    disableAutocomplete=false,
-    enableSearch=false,
+    position = 'top-[90px]',
+    disableAutocomplete = false,
+    enableSearch = false,
     searchFunction,
-    searchInProgress=false
-}) => {
-    const [activeValue, setActiveValue] = useState(preSelected && preSelectedLabel ? preSelected[preSelectedLabel] : '')
-    const [visibleOptions, setVisibleOptions] = useState(selectOptions)
+    searchInProgress = false,
+}: AutocompleteSelectProps) => {
+    const preselectedText = useMemo(() => {
+        if (!preSelected) {
+            return ''
+        }
+
+        if (preSelectedLabel && getText(preSelected, preSelectedLabel)) {
+            return getText(preSelected, preSelectedLabel)
+        }
+
+        const match = selectOptions?.find((option) =>
+            preSelectedLabel ? getField(option, preSelectedLabel) === preSelected : option === preSelected,
+        )
+        if (!match) {
+            return ''
+        }
+        return preSelectedLabel ? getText(match, titleField) : getText(match)
+    }, [preSelected, preSelectedLabel, selectOptions, titleField])
+
+    // typedValue overrides the preselected text until the preselection changes
+    const [typedValue, setTypedValue] = useState<string | null>(null)
+    const [lastPreselectedText, setLastPreselectedText] = useState(preselectedText)
+    if (lastPreselectedText !== preselectedText) {
+        setLastPreselectedText(preselectedText)
+        setTypedValue(null)
+    }
+    const activeValue = typedValue ?? preselectedText
+    const setActiveValue = setTypedValue
+
+    const [filterTerm, setFilterTerm] = useState('')
+    const visibleOptions = useMemo(() => {
+        if (!filterTerm || (enableSearch && searchFunction)) {
+            return selectOptions || []
+        }
+        return selectOptions.filter((option) =>
+            getText(option, titleField).toLowerCase().includes(filterTerm.toLowerCase()),
+        )
+    }, [filterTerm, enableSearch, searchFunction, selectOptions, titleField])
     const [optionsOpen, setOptionsOpen] = useState(false)
 
     const debouncedSearch = useMemo(() => {
@@ -42,45 +123,11 @@ const AutocompleteSelect = ({
     }, [enableSearch, searchFunction])
 
     useEffect(() => {
-        return () => {
-            if (debouncedSearch?.cancel) {
-                debouncedSearch.cancel()
-            }
-        }
+        return () => debouncedSearch?.cancel()
     }, [debouncedSearch])
 
-    useEffect(() => {
-        setVisibleOptions(selectOptions || [])
-    }, [selectOptions])
-
-    useEffect(() => {
-        const preSelect = () => {
-            if(!preSelected || preSelected === undefined) {
-                return
-            }
-
-            if (preSelectedLabel && preSelected[preSelectedLabel]) {
-                setActiveValue(preSelected[preSelectedLabel])
-                return
-            }
-    
-            selectOptions?.forEach((option) => {
-                if (preSelectedLabel && preSelectedLabel !== '' && option[preSelectedLabel] && option[preSelectedLabel] === preSelected) {
-                    setActiveValue(option[titleField])
-                }
-
-                if ((!preSelectedLabel || preSelectedLabel === '') && option === preSelected) {
-                    setActiveValue(option)
-                }
-            })
-        }
-        preSelect()
-    
-    }, [preSelected, preSelectedLabel, selectOptions, titleField])
-
-
     const openOptions = () => {
-        if(disabled) {return}
+        if (disabled) { return }
         setOptionsOpen(true)
     }
 
@@ -88,41 +135,35 @@ const AutocompleteSelect = ({
         setOptionsOpen(false)
     }
 
-    const filterOptions = (term) => {
-        if(enableSearch && enableSearch === true && searchFunction) {
+    const filterOptions = (term: string) => {
+        if (enableSearch && searchFunction) {
             debouncedSearch?.(term)
             setActiveValue(term)
             return
-        } 
-        const filtered = selectOptions.filter((option)=> {
-            if (titleField && titleField !== '') {
-                return option[titleField].toLowerCase().includes(term.toLowerCase())
-            } else {
-                return option.toLowerCase().includes(term.toLowerCase())
-            }
-        })
+        }
         setActiveValue(term)
-        setVisibleOptions(filtered)
-
+        setFilterTerm(term)
     }
 
-    const changeActiveValue = (value, object) => {
+    const changeActiveValue = (value: string, option: AutocompleteOption) => {
         setActiveValue(value)
-        returnFieldValue(object)
+        setFilterTerm('')
+        returnFieldValue(option)
         closeOptions()
     }
 
-    const [conditionalItemProcessing, setConditionalItemProcessing] = useState('');
-    const fireConditionalAction = async (option) => {
-        setConditionalItemProcessing(option[conditionalItemStyling.itemIdentifier])
+    const [conditionalItemProcessing, setConditionalItemProcessing] = useState('')
+    const fireConditionalAction = async (option: AutocompleteOption) => {
+        if (!conditionalItemStyling) { return }
+        setConditionalItemProcessing(getText(option, conditionalItemStyling.itemIdentifier))
 
         await conditionalItemStyling.action(option)
         setTimeout(() => {
-            setConditionalItemProcessing('')        
-        }, 3000);
+            setConditionalItemProcessing('')
+        }, 3000)
     }
 
-    const wrapperRef = useRef(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
     useOutsideAlerter(wrapperRef, closeOptions);
 
 
@@ -172,50 +213,49 @@ const AutocompleteSelect = ({
                     <div className='relative'>
                         {searchInProgress && <InlinePreloader />}
                         {!searchInProgress && visibleOptions.map((option, optionIndex) => (
-                            <button key={optionIndex} 
+                            <button type='button' key={optionIndex}
                                 className={
                                     `relative w-full capitalize p-3 my-1 flex flex-row text-left items-center gap-x-3 text-sm transition duration-200 hover:bg-gray-100 
-                                    ${conditionalItemStyling && option[conditionalItemStyling.conditionTriggerKey] == true 
+                                    ${conditionalItemStyling && getField(option, conditionalItemStyling.conditionTriggerKey) === true 
                                         ? conditionalItemStyling.classes 
                                         : 'text-gray-500'}`
                                 } 
                                 
                                 onClick={()=>{
-                                    if(conditionalItemStyling && option[conditionalItemStyling.conditionTriggerKey] === true) {
+                                    if(conditionalItemStyling && getField(option, conditionalItemStyling.conditionTriggerKey) === true) {
                                         fireConditionalAction(option)
                                     } else {
-                                        changeActiveValue(titleField && titleField !== '' ? option[titleField] : option, option)}
+                                        changeActiveValue(getText(option, titleField), option)}
                                     }
                                 }
                             >
                                 {displayImage && !bgImage &&
-                                    <img alt="" src={option[imageField]} className='w-7.5' />
+                                    <img alt="" src={getText(option, imageField)} className='w-7.5' />
                                 }
 
                                 {displayImage && bgImage &&
                                     <div className='w-8.75 h-8.75 rounded-full' style={{
-                                        backgroundImage: `url(${ option[imageField]})`, backgroundSize: 'cover', backgroundPosition: 'center'
+                                        backgroundImage: `url(${ getText(option, imageField)})`, backgroundSize: 'cover', backgroundPosition: 'center'
                                     }} />
                                 }
-                                {/* <img alt="" src={option[imageField]} className='w-[30px]' /> */}
+                                {/* <img alt="" src={getText(option, imageField)} className='w-[30px]' /> */}
 
-                                {conditionalItemStyling && option[conditionalItemStyling.conditionTriggerKey]}
-
+                                
                                 
                                 <div className='w-full'>
-                                    <span className='dark:text-at-white block font-space-grotesk'>{titleField && titleField !== '' ? option[titleField] : option}</span>
-                                    {option.description && <span className='text-xs dark:text-at-white/70'>{option.description}</span>}
+                                    <span className='dark:text-at-white block font-space-grotesk'>{getText(option, titleField)}</span>
+                                    {typeof option !== 'string' && option.description && <span className='text-xs dark:text-at-white/70'>{option.description}</span>}
                                 </div>
                                 
-                                {conditionalItemStyling && option[conditionalItemStyling.conditionTriggerKey] === true && !conditionalItemStyling.actionProcessed && conditionalItemStyling.includeButton &&
+                                {conditionalItemStyling && getField(option, conditionalItemStyling.conditionTriggerKey) === true && !conditionalItemStyling.actionProcessed && conditionalItemStyling.includeButton &&
                                     <>
-                                        {conditionalItemProcessing === option[conditionalItemStyling.itemIdentifier] ?
+                                        {conditionalItemProcessing === getText(option, conditionalItemStyling.itemIdentifier) ?
                                             <span className='absolute right-12 w-5'>
                                                 <InlinePreloader />
                                             </span>
                                             :
                                             <span className={`${conditionalItemStyling.buttonClasses}`}>
-                                                {conditionalItemStyling.itemProcessed === option[conditionalItemStyling.itemIdentifier] ?
+                                                {conditionalItemStyling.itemProcessed === getField(option, conditionalItemStyling.itemIdentifier) ?
                                                     <CheckIcon className={`w-4 h-4 text-green-500`} />
                                                     :
                                                     conditionalItemStyling.buttonLabel
@@ -228,7 +268,7 @@ const AutocompleteSelect = ({
                         ))}
                         {/* Footer Button */}
                         {includeButton && includeButton === true &&
-                            <button className='absolute -bottom-13.75 left-[10%] right-auto w-[80%] px-3 py-4 text-center text-sm bg-black font-tomato transition duration-200 hover:bg-gray-800 text-white flex items-center justify-center gap-x-1' onClick={()=>{buttonAction()}}>
+                            <button type='button' className='absolute -bottom-13.75 left-[10%] right-auto w-[80%] px-3 py-4 text-center text-sm bg-black font-tomato transition duration-200 hover:bg-gray-800 text-white flex items-center justify-center gap-x-1' onClick={()=>{buttonAction?.()}}>
                                 <PlusIcon className={`w-4 h-4`}/>
                                 {buttonLabel}
                             </button>
@@ -239,19 +279,5 @@ const AutocompleteSelect = ({
         </div>
     )
 }
-
-AutocompleteSelect.propTypes = {
-    selectOptions: PropTypes.array.isRequired,
-    inputLabel: PropTypes.string.isRequired,
-    titleField: PropTypes.string.isRequired,
-    displayImage: PropTypes.bool.isRequired,
-    imageField: PropTypes.string,
-    fieldId: PropTypes.string.isRequired,
-    hasError: PropTypes.bool,
-    includeButton: PropTypes.bool,
-    buttonLabel: PropTypes.string,
-    buttonAction: PropTypes.func,
-    returnFieldValue: PropTypes.func.isRequired
-};
 
 export default AutocompleteSelect

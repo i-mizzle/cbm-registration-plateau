@@ -1,7 +1,21 @@
 import React, { useState } from 'react'
+import type { MouseEvent } from 'react'
 import EyeIcon from '../icons/EyeIcon'
 import EyeOffIcon from '../icons/EyeOffIcon'
 import PasswordMeter from '../PasswordMeter'
+
+type PasswordFieldProps = {
+    requiredField?: boolean
+    inputLabel: string
+    fieldId: string
+    hasError?: string | boolean
+    returnFieldValue: (value: string) => void
+    preloadValue?: string
+    disabled?: boolean
+    inputPlaceholder?: string
+    maxLength?: number
+    showPasswordMeter?: boolean
+}
 
 const PasswordField = ({
     requiredField,
@@ -13,20 +27,20 @@ const PasswordField = ({
     disabled, 
     inputPlaceholder,
     maxLength,
-    showPasswordMeter
-}) => {
-    const [ fieldValue, setFieldValue ] = useState(preloadValue)
+    showPasswordMeter,
+}: PasswordFieldProps) => {
+    const [ fieldValue, setFieldValue ] = useState(preloadValue ?? '')
     const [ hiddenInput, setHiddenInput ] = useState(true)
     // const id = generateCode(12)
 
     // const [fieldId, setFieldId] = useState(id)
 
-    const toggleHiddenInput = (e) => {
+    const toggleHiddenInput = (e: MouseEvent) => {
         e.preventDefault()
         setHiddenInput(!hiddenInput)
     }
 
-    const setValue = (value) => {
+    const setValue = (value: string) => {
         setFieldValue(value)
         returnFieldValue(value)
     }
@@ -35,17 +49,14 @@ const PasswordField = ({
         <div className='relative'
         >
             <div className="flex items-center justify-between">
-                <label 
+                <label
+                    htmlFor={fieldId}
                     className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                     ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                 >
-                    {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                    {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                 </label>
-                <label 
-                    className={`text-xs text-red-400`}
-                >
-                    {hasError}
-                </label>
+                <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
             </div>
 
             <span className={`absolute z-40 cursor-pointer pt-2 top-11 right-4`} onClick={(e)=>{toggleHiddenInput(e)}}>

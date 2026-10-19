@@ -1,40 +1,13 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 
-const formatDisplayDate = (value) => {
-  if (!value) return ''
-  if (typeof value === 'string') {
-    const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (isoMatch) {
-      return `${isoMatch[3]}/${isoMatch[2]}/${isoMatch[1]}`
-    }
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(value)) {
-      return value
-    }
-  }
-  return ''
-}
-
-const parseDateValue = (value) => {
-  if (!value || typeof value !== 'string') return ''
-  const displayMatch = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-  if (displayMatch) {
-    const [, day, month, year] = displayMatch
-    const candidate = new Date(`${year}-${month}-${day}`)
-    if (
-      candidate instanceof Date &&
-      !Number.isNaN(candidate.getTime()) &&
-      candidate.getFullYear() === Number(year) &&
-      candidate.getMonth() + 1 === Number(month) &&
-      candidate.getDate() === Number(day)
-    ) {
-      return `${year}-${month}-${day}`
-    }
-  }
-  const isoMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  if (isoMatch) {
-    return value
-  }
-  return value
+type DateFieldProps = {
+    requiredField?: boolean
+    inputLabel: string
+    fieldId: string
+    hasError?: string | boolean
+    returnFieldValue: (value: string) => void
+    preloadValue?: string
+    disabled?: boolean
 }
 
 const DateField = ({
@@ -44,12 +17,12 @@ const DateField = ({
     hasError, 
     returnFieldValue, 
     preloadValue, 
-    disabled, 
-}) => {
-    const [ fieldValue, setFieldValue ] = useState(preloadValue)
+    disabled,
+}: DateFieldProps) => {
+    const [ fieldValue, setFieldValue ] = useState(preloadValue ?? '')
 
 
-    const setValue = (value) => {
+    const setValue = (value: string) => {
         setFieldValue(value)
         returnFieldValue(value)
     }
@@ -57,17 +30,14 @@ const DateField = ({
     return (
         <div>
             <div className="flex items-center justify-between">
-                <label 
+                <label
+                    htmlFor={fieldId}
                     className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                     ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                 >
-                    {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                    {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                 </label>
-                <label 
-                    className={`text-xs text-red-400`}
-                >
-                    {hasError}
-                </label>
+                <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
             </div>
             <input 
                 id={fieldId} 

@@ -2,6 +2,17 @@ import React, { useState, useRef, useEffect } from 'react'
 import { getCountries, getCountryCallingCode } from 'libphonenumber-js'
 import ChevronIcon from '../icons/ChevronIcon'
 
+type PhoneNumberFieldProps = {
+    requiredField?: boolean
+    inputLabel?: string
+    inputPlaceholder?: string
+    fieldId: string
+    hasError?: string | boolean
+    returnFieldValue: (value: string) => void
+    preloadValue?: string
+    disabled?: boolean
+}
+
 const PhoneNumberField = ({
     requiredField,
     inputLabel, 
@@ -10,13 +21,13 @@ const PhoneNumberField = ({
     hasError, 
     returnFieldValue, 
     preloadValue, 
-    disabled
-}) => {
+    disabled,
+}: PhoneNumberFieldProps) => {
     const [fieldValue, setFieldValue] = useState(preloadValue || '')
-    const [selectedCountry, setSelectedCountry] = useState('NG')
+    const [selectedCountry, setSelectedCountry] = useState<string>('NG')
     const [dropdownOpen, setDropdownOpen] = useState(false)
     const [searchTerm, setSearchTerm] = useState('')
-    const dropdownRef = useRef(null)
+    const dropdownRef = useRef<HTMLDivElement>(null)
 
     // Get all countries with their calling codes
     const getCountriesList = () => {
@@ -47,8 +58,8 @@ const PhoneNumberField = ({
 
     // Close dropdown when clicking outside
     useEffect(() => {
-        const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && event.target instanceof Node && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false)
             }
         }
@@ -57,13 +68,13 @@ const PhoneNumberField = ({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const handleCountrySelect = (countryCode) => {
+    const handleCountrySelect = (countryCode: string) => {
         setSelectedCountry(countryCode)
         setDropdownOpen(false)
         setSearchTerm('')
     }
 
-    const setValue = (value) => {
+    const setValue = (value: string) => {
         // Remove alphabetic characters, only allow digits and common phone number characters
         const filteredValue = value.replace(/[a-zA-Z]/g, '')
         
@@ -83,17 +94,14 @@ const PhoneNumberField = ({
         <div className='max-w-full'>
             {inputLabel && inputLabel !== '' && (
                 <div className="flex items-center justify-between">
-                    <label 
+                    <label
+                        htmlFor={fieldId}
                         className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                         ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                     >
-                        {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                        {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                     </label>
-                    <label 
-                        className={`text-xs text-red-400`}
-                    >
-                        {hasError}
-                    </label>
+                    <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
                 </div>
             )}
 

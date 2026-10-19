@@ -1,71 +1,68 @@
-import React, { useState } from "react";
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import UndoIcon from '../../../../assets/images/icons/undo.svg'
-import RedoIcon from '../../../../assets/images/icons/redo.svg'
+import React, { useRef, useState } from "react";
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 
-const Wysiwyg = ({fieldTitle, initialValue, updateValue, hasError}) => {
+type WysiwygProps = {
+    fieldTitle?: string
+    initialValue?: string
+    updateValue: (value: string) => void
+    hasError?: string | boolean
+}
+
+type QuillHistory = { undo: () => void; redo: () => void }
+
+const modules = {
+    toolbar: [
+        [{ 'header': [1, 2, false] }],
+        ['bold', 'italic', 'underline', 'color'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+        ['link', 'image', 'video']
+    ],
+    history: {
+        delay: 500,
+        maxStack: 100,
+        userOnly: true
+    }
+}
+
+const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'color',
+    'list', 'bullet', 'indent',
+    'link', 'image', 'video'
+]
+
+const Wysiwyg = ({ fieldTitle, initialValue, updateValue, hasError }: WysiwygProps) => {
     const [value, setValue] = useState(initialValue || '');
-    const [reactQuillRef, setReactQuillRef] = useState('')
-    const modules = {
-        toolbar: [
-            [{ 'header': [1, 2, false] }],
-            ['bold', 'italic', 'underline','color'],
-            [{'list': 'ordered'}, {'list': 'bullet'}, {'indent': '-1'}, {'indent': '+1'}],
-            // [{ 'script': 'sub'}, { 'script': 'super' }],
-            ['link', 'image', 'video']
-        ],
-        history: {
-            delay: 500,
-            maxStack: 100,
-            userOnly: true
-        }
-    }
+    const quillRef = useRef<ReactQuill>(null)
 
-    const formats = [
-        'header',
-        'bold', 'italic', 'underline', 'color',
-        'list', 'bullet', 'indent',
-        'link', 'image', 'video'
-    ]
+    const getHistory = () =>
+        quillRef.current?.getEditor().getModule('history') as QuillHistory | undefined
 
-    function undoChange() {
-        let myEditor = reactQuillRef.getEditor();
-        myEditor.history.undo();
-    }
-
-    function redoChange() {
-        let myEditor = reactQuillRef.getEditor();
-        myEditor.history.redo();
-    }
-
-    const changeValue = (input) => {
+    const changeValue = (input: string) => {
         setValue(input)
-        updateValue(value)
+        updateValue(input)
     }
 
     return (
         <div className={`relative border rounded-lg ${hasError ? 'border-red-500' : 'border-transparent'}`}>
-            <label className={`block font-medium font-outfit mb-2 text-xs ${hasError? 'text-red-500' : 'text-black'}`}>{fieldTitle}</label>
-            {/* <button onclick={modules.history.undo()}>UNDO</button> */}
+            <span className={`block font-medium font-outfit mb-2 text-xs ${hasError ? 'text-red-500' : 'text-black'}`}>{fieldTitle}</span>
             <div className="absolute top-0 left-0">
-                <button className="ql-undo mr-5" onClick={undoChange}>
-                    <img alt="" src={UndoIcon} />
+                <button type="button" className="ql-undo mr-5" aria-label="Undo" onClick={() => getHistory()?.undo()}>
+                    ↶
                 </button>
-                <button className="ql-redo" onClick={redoChange}>
-                    <img alt="" src={RedoIcon} />
+                <button type="button" className="ql-redo" aria-label="Redo" onClick={() => getHistory()?.redo()}>
+                    ↷
                 </button>
             </div>
-            <ReactQuill 
-                ref={(el) => {setReactQuillRef(el)}}
-                theme="snow" 
-                value={value} 
-                modules={modules} 
-                formats={formats} 
+            <ReactQuill
+                ref={quillRef}
+                theme="snow"
+                value={value}
+                modules={modules}
+                formats={formats}
                 onChange={changeValue}
-            >
-                {/* <div className="" /> */}
-            </ReactQuill>
+            />
         </div>
     );
 }

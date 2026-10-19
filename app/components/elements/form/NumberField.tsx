@@ -1,6 +1,18 @@
 import React, { useState } from 'react'
 import {NumericFormat} from 'react-number-format';
 
+type NumberFieldProps = {
+    inputLabel: string
+    fieldId: string
+    inputPlaceholder?: string
+    hasError?: string | boolean
+    returnFieldValue: (value: number | undefined) => void
+    preloadValue?: number | string
+    disabled?: boolean
+    maxLength?: number
+    requiredField?: boolean
+}
+
 const NumberField = ({
     inputLabel, 
     fieldId, 
@@ -10,12 +22,12 @@ const NumberField = ({
     preloadValue, 
     disabled, 
     maxLength,
-    requiredField
-}) => {
+    requiredField,
+}: NumberFieldProps) => {
 
-    const [ fieldValue, setFieldValue ] = useState(preloadValue)
+    const [ fieldValue, setFieldValue ] = useState<number | string | undefined>(preloadValue ?? '')
 
-    const setValue = (value) => {
+    const setValue = (value: number | undefined) => {
         setFieldValue(value)
         returnFieldValue(value)
     }
@@ -23,17 +35,14 @@ const NumberField = ({
     return (
         <div>
             <div className="flex items-center justify-between">
-                <label 
+                <label
+                    htmlFor={fieldId}
                     className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                     ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                 >
-                    {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                    {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                 </label>
-                <label 
-                    className={`text-xs text-red-400`}
-                >
-                    {hasError}
-                </label>
+                <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
             </div>
             
             <NumericFormat
@@ -52,7 +61,7 @@ const NumberField = ({
                 decimalScale={2}
                 fixedDecimalScale={false}
                 className={`rounded py-4 px-4 text-sm block w-full focus:border-gray-800 focus:outline-none hover:border-gray-200 dark:hover:border-at-dark-gray border bg-at-black/5 dark:bg-at-dark-gray/5 transition duration-200 focus:bg-white dark:focus:bg-at-black/60 font-outfit placeholder:text-slate-400 placeholder:font-outfit  ${hasError ? 'border-red-400' : 'border-transparent'}`}
-                onValueChange={(values, sourceInfo)=>{setValue(values.floatValue)}}
+                onValueChange={(values)=>{setValue(values.floatValue)}}
             />
         </div>
     )

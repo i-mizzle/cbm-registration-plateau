@@ -1,7 +1,14 @@
 import { Switch } from '@headlessui/react';
 import React from 'react'
 
-const ToggleSwitch = ({label, description, toggle, checked}) => {
+type ToggleSwitchProps = {
+  label: string
+  description?: string
+  toggle: (checked: boolean) => void
+  checked: boolean
+}
+
+const ToggleSwitch = ({label, description, toggle, checked}: ToggleSwitchProps) => {
   return (
     <div className='w-full flex items-start justify-between gap-x-5 p-3 bg-gray-100 dark:bg-slate-900/20'>
         <div className="w-full">

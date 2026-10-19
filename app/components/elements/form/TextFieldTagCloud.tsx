@@ -1,5 +1,20 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent, SyntheticEvent } from 'react'
 import CloseIcon from '../icons/CloseIcon'
+
+type TextFieldTagCloudProps = {
+    inputLabel: string
+    fieldId: string
+    inputPlaceholder?: string
+    hasError?: string | boolean
+    returnFieldValue: (tags: string[]) => void
+    preloadValue?: string[]
+    disabled?: boolean
+    autoFocus?: boolean
+    maxLength?: number
+    maxTags?: number
+    requiredField?: boolean
+}
 
 const TextFieldTagCloud = ({
     inputLabel, 
@@ -12,9 +27,9 @@ const TextFieldTagCloud = ({
     autoFocus,
     maxLength,
     maxTags,
-    requiredField
-}) => {
-    const inputRef = useRef(null)
+    requiredField,
+}: TextFieldTagCloudProps) => {
+    const inputRef = useRef<HTMLInputElement>(null)
     const [ isFocused, setIsFocused ] = useState(false)
     const [ fieldValue, setFieldValue ] = useState('')
 
@@ -31,14 +46,14 @@ const TextFieldTagCloud = ({
         }
     }, [autoFocus])
 
-    const setValue = (value) => {
+    const setValue = (value: string) => {
         setFieldValue(value)
         // returnFieldValue(value)
     }
 
-    const [tags, setTags] = useState(preloadValue ? preloadValue : [])
+    const [tags, setTags] = useState<string[]>(preloadValue ?? [])
 
-    const addTag = (e) => {
+    const addTag = (e?: SyntheticEvent) => {
         if(disabled){
             return
         }
@@ -51,7 +66,7 @@ const TextFieldTagCloud = ({
             return
         }
 
-        if(tags.length === maxTags) {
+        if(maxTags !== undefined && tags.length >= maxTags) {
             return
         }
 
@@ -69,7 +84,7 @@ const TextFieldTagCloud = ({
         focusField()
     }
 
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
         if (disabled) {
             return
         }
@@ -94,7 +109,7 @@ const TextFieldTagCloud = ({
         }
     }
 
-    const removeTag = (toDelete) => {
+    const removeTag = (toDelete: string) => {
         if(disabled){
             return
         }
@@ -110,17 +125,14 @@ const TextFieldTagCloud = ({
     return (
         <>
             <div className="flex items-center justify-between">
-                <label 
+                <label
+                    htmlFor={fieldId}
                     className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                     ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                 >
-                    {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                    {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                 </label>
-                <label 
-                    className={`text-xs text-red-400`}
-                >
-                    {hasError}
-                </label>
+                <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
             </div>
             <div 
                 className={`rounded py-4 px-4 text-sm block w-full focus:border-gray-800 focus:outline-none hover:border-gray-200 dark:hover:border-at-dark-gray border bg-at-black/5 dark:bg-at-dark-gray/5 transition duration-200 focus:bg-white dark:focus:bg-at-black/60 font-outfit placeholder:font-outfit  ${hasError ? 'border-red-400' : 'border-transparent'}`}
@@ -133,12 +145,12 @@ const TextFieldTagCloud = ({
                     {tags.map((tag, tagIndex)=>(
                         <span key={tagIndex} className='flex items-center gap-x-3 px-2 py-2 rounded bg-gray-100 dark:bg-at-black text-xs text-black dark:text-white w-max font-medium'>
                             {tag}
-                            {!disabled && <button className='' onClick={()=>{removeTag(tag)}}>
+                            {!disabled && <button type='button' onClick={()=>{removeTag(tag)}}>
                                 <CloseIcon className={`w-4`} />
                             </button>}
                         </span>
                     ))}
-                    {!disabled && <form onSubmit={(e)=>{addTag(e)}}>
+                    {!disabled && <div>
                         <input 
                             id={fieldId} 
                             ref={inputRef}
@@ -152,7 +164,7 @@ const TextFieldTagCloud = ({
                             value={fieldValue}
                             disabled={disabled}
                         />
-                    </form>}
+                    </div>}
                 </div>
 
             </div>

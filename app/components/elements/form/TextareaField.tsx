@@ -1,10 +1,22 @@
 import React, { useState } from 'react'
 
-const TextareaField = ({inputLabel, fieldId, maxLength, requiredField, hasError, returnFieldValue, preloadValue, disabled, inputPlaceholder}) => {
+type TextareaFieldProps = {
+    inputLabel: string
+    fieldId: string
+    maxLength?: number
+    requiredField?: boolean
+    hasError?: string | boolean
+    returnFieldValue?: (value: string) => void
+    preloadValue?: string
+    disabled?: boolean
+    inputPlaceholder?: string
+}
+
+const TextareaField = ({inputLabel, fieldId, maxLength, requiredField, hasError, returnFieldValue, preloadValue, disabled, inputPlaceholder}: TextareaFieldProps) => {
 
     const [ fieldValue, setFieldValue ] = useState(preloadValue || '')
 
-    const setValue = (value) => {
+    const setValue = (value: string) => {
         setFieldValue(value)
         if (returnFieldValue) {
             returnFieldValue(value)
@@ -15,17 +27,14 @@ const TextareaField = ({inputLabel, fieldId, maxLength, requiredField, hasError,
         <div>
             {/* {fieldValue} */}
             <div className="flex items-center justify-between">
-                <label 
+                <label
+                    htmlFor={fieldId}
                     className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
                     ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
                 >
-                    {inputLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+                    {inputLabel} {requiredField && <span className='text-red-400'>*</span>}
                 </label>
-                <label 
-                    className={`text-xs text-red-400`}
-                >
-                    {hasError}
-                </label>
+                <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
             </div>
             <textarea 
                 id={fieldId} 

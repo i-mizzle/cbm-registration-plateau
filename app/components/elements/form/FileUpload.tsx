@@ -1,24 +1,73 @@
 import React, { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { FileUploader } from "react-drag-drop-files";
-import { useDispatch } from 'react-redux';
-import { ERROR } from '../../../../store/types';
-import { authHeader, baseUrl } from '../../../../utils/utils';
 import UploadIcon from '../icons/UploadIcon';
 import ArrowPathIcon from '../icons/ArrowPathIcon';
 
-const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, preAddedFile, preAddedFileName, acceptedFormats, maxFileSize}) => {
-  const [fileName, setFileName] = useState(null)
-  const [fileExt, setFileExt] = useState(null)
-  const [uploadedFile, setUploadedFile] = useState(null)
-  const [fileSize, setFileSize] = useState(null)
+export type UploadedFileDetails = {
+  file: File
+  fileName: string
+  fileExt: string
+  fileSize: number
+  fileSizeInBytes: number
+  cloudinaryPublicUrl?: string
+  publicUrl?: string
+  uploadedFile: Record<string, unknown>
+  uploadResponse: unknown
+}
+
+type FileUploadProps = {
+  hasError?: string | boolean
+  returnFileDetails: (details: UploadedFileDetails | null) => void
+  fieldLabel?: string
+  requiredField?: boolean
+  preAddedFile?: string
+  preAddedFileName?: string
+  acceptedFormats?: string[]
+  maxFileSize?: number
+  uploadUrl: string
+  uploadHeaders?: Record<string, string>
+  onError?: (message: string) => void
+}
+
+const UploaderChildren = ({ hasFile, allowedFormats }: { hasFile: boolean; allowedFormats: string[] }) => (
+  <div className='rounded-md text-center'>
+    <UploadIcon className='w-6 h-6 text-gray-400 mx-auto' />
+    <p className='text-xs text-gray-500 mb-1 mt-1'>Click or drop file here to {hasFile ? 'change' : 'upload'}</p>
+    <p className='text-xs text-gray-400'>Allowed formats: {allowedFormats.join(', ')}</p>
+  </div>
+)
+
+const getErrorMessage = (error: unknown) => {
+  if (axios.isAxiosError(error)) {
+    return error.response?.data?.message || error.message
+  }
+  return error instanceof Error ? error.message : 'File upload failed'
+}
+
+const FileUpload = ({
+  hasError,
+  returnFileDetails,
+  fieldLabel,
+  requiredField,
+  preAddedFile,
+  preAddedFileName = '',
+  acceptedFormats,
+  maxFileSize,
+  uploadUrl,
+  uploadHeaders,
+  onError,
+}: FileUploadProps) => {
+  const [fileName, setFileName] = useState<string | null>(null)
+  const [fileExt, setFileExt] = useState<string | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null)
+  const [fileSize, setFileSize] = useState<number | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadError, setUploadError] = useState(null)
-  const [selectedFile, setSelectedFile] = useState(null)
-  const abortControllerRef = useRef(null)
-  const uploadedFileRef = useRef(null)
-  const dispatch = useDispatch()
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const uploadedFileRef = useRef<string | null>(null)
 
   const allowedFormats = acceptedFormats ? acceptedFormats : ['jpg', 'jpeg', 'png', 'pdf']
   const maxUploadSizeInMB = maxFileSize ? (maxFileSize > 1000 ? maxFileSize / (1024 * 1024) : maxFileSize) : 4
@@ -29,40 +78,15 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
 
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
+      abortControllerRef.current?.abort()
 
-      if (uploadedFileRef.current && uploadedFileRef.current.startsWith('blob:')) {
+      if (uploadedFileRef.current?.startsWith('blob:')) {
         URL.revokeObjectURL(uploadedFileRef.current)
       }
     }
   }, [])
 
-  const extractCloudinaryUrl = (payload) => {
-    if (!payload) {
-      return null
-    }
-
-    return (
-      payload.cloudinaryPublicUrl ||
-      payload.publicUrl ||
-      payload.public_url ||
-      payload.secureUrl ||
-      payload.secure_url ||
-      payload.url ||
-      payload.cloudinary?.secure_url ||
-      payload.cloudinary?.url ||
-      payload.file?.secure_url ||
-      payload.file?.url ||
-      null
-    )
-  }
-
-  const uploadSelectedFile = async (addedFile) => {
-    if (!addedFile) {
-      return
-    }
+  const uploadSelectedFile = async (addedFile: File) => {
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -76,7 +100,7 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
     }
 
     const localPreviewUrl = URL.createObjectURL(addedFile)
-    const parsedFileExt = addedFile.name.split('.').pop()
+    const parsedFileExt = addedFile.name.split('.').pop() ?? ''
     const parsedFileName = addedFile.name.split('.').slice(0, -1).join('.') || addedFile.name
     const parsedFileSize = addedFile.size / 1000000
 
@@ -93,13 +117,8 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
       const formData = new FormData()
       formData.append('file', addedFile)
 
-      const headers = {
-        ...authHeader(),
-        'Content-Type': 'multipart/form-data'
-      }
-
-      const response = await axios.post(`${baseUrl}/files/new`, formData, {
-        headers,
+      const response = await axios.post(uploadUrl, formData, {
+        headers: { ...uploadHeaders, 'Content-Type': 'multipart/form-data' },
         signal: controller.signal,
         onUploadProgress: (progressEvent) => {
           if (!progressEvent.total) {
@@ -111,8 +130,9 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
         }
       })
 
-      const uploadedPayload = response?.data?.data || response?.data || {}
-      const cloudinaryPublicUrl = uploadedPayload.file
+      const uploadedPayload: Record<string, unknown> = response?.data?.data || response?.data || {}
+      const cloudinaryPublicUrl =
+        typeof uploadedPayload.file === 'string' ? uploadedPayload.file : undefined
       const uploadedFileDetails = {
         file: addedFile,
         fileName: addedFile.name,
@@ -128,35 +148,32 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
       setUploadProgress(100)
       returnFileDetails(uploadedFileDetails)
     } catch (error) {
-      if (axios.isCancel(error) || error?.code === 'ERR_CANCELED') {
+      if (axios.isCancel(error)) {
         setUploadError('Upload canceled')
         setUploadProgress(0)
         return
       }
 
-      const errorMessage = error?.response?.data?.message || error?.message || 'File upload failed'
+      const errorMessage = getErrorMessage(error)
 
       setUploadError(errorMessage)
       setUploadProgress(0)
-
-      dispatch({
-        type: ERROR,
-        error: {response: {data: {message: errorMessage}}}
-      })
+      onError?.(errorMessage)
     } finally {
       abortControllerRef.current = null
       setIsUploading(false)
     }
   }
 
-  const handleFile = async (addedFile) => {
-    uploadSelectedFile(addedFile)
+  const handleFile = (added: File | File[]) => {
+    const addedFile = Array.isArray(added) ? added[0] : added
+    if (addedFile) {
+      void uploadSelectedFile(addedFile)
+    }
   }
 
   const cancelUpload = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort()
-    }
+    abortControllerRef.current?.abort()
   }
 
   const retryUpload = () => {
@@ -164,7 +181,7 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
       return
     }
 
-    uploadSelectedFile(selectedFile)
+    void uploadSelectedFile(selectedFile)
   }
 
   const toggleChange = () => {
@@ -182,31 +199,18 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
     }
   }
 
-  const UploaderChildren = () =>{
-    return (
-      <div className='rounded-md text-center'>
-        <UploadIcon className={`w-6 h-6 text-gray-400 mx-auto`} />
-        <p className='text-xs text-gray-500 mb-1 mt-1'>Click or drop file here to {uploadedFile || preAddedFile ? 'change' : 'upload' }</p>
-        <p className='text-xs text-gray-400'>Allowed formats: {allowedFormats.join(', ')}</p>
-      </div>
-    )
-  }
   return (
     <div className='relative'>
       {!preAddedFile &&<div className="flex items-center justify-between">
-          <label 
+          <label
               className={`text-sm lg:text-md cursor-text z-10 relative py-1 transition mb-1 block duration-200  
               ${hasError ? 'text-red-400' : 'text-gray-500 dark:text-gray-300'}`}
           >
-              {fieldLabel} {requiredField && requiredField === true && <span className='text-red-400'>*</span>}
+              {fieldLabel} {requiredField && <span className='text-red-400'>*</span>}
           </label>
-          <label 
-              className={`text-xs text-red-400`}
-          >
-              {hasError}
-          </label>
+          <span className='text-xs text-red-400'>{typeof hasError === 'string' ? hasError : ''}</span>
       </div>}
-      <div className={`${hasError && hasError===true ? 'border-red-400' : 'border-gray-400'} border-dashed my-1 rounded block border bg-transparent items-center relative w-full p-4`}>
+      <div className={`${hasError ? 'border-red-400' : 'border-gray-400'} border-dashed my-1 rounded block border bg-transparent items-center relative w-full p-4`}>
 
           {!isUploading && !uploadedFile && !preAddedFile && <FileUploader
             multiple={false}
@@ -215,34 +219,18 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
             types={allowedFormats}
             label='Click to upload or drop a file here'
             hoverTitle=""
-            onTypeError={(error)=>{
-              dispatch({
-                  type: ERROR,
-                  error: {response: {data: {
-                      message: error
-                  }}}
-              })
-            }}
+            onTypeError={(error) => onError?.(error)}
             maxSize={maxUploadSizeInMB}
-            onSizeError={(error)=>{
-              dispatch({
-                type: ERROR,
-                error: {response: {data: {
-                    message: error
-                }}}
-            })
-            }}
+            onSizeError={(error) => onError?.(error)}
             classes="border-gray-200 block w-full flex items-center justify-center"
-            // className={`block w-full`}
-            // children={}
           >
-            <UploaderChildren />
+            <UploaderChildren hasFile={Boolean(uploadedFile || preAddedFile)} allowedFormats={allowedFormats} />
           </FileUploader>}          
 
 
           {(preAddedFile || uploadedFile) && 
           <>
-            <button onClick={()=>(toggleChange())} className="text-xs font-medium absolute top-3 right-3"><ArrowPathIcon className="w-4 h-4" /></button>
+            <button type='button' aria-label='Change file' onClick={toggleChange} className="text-xs font-medium absolute top-3 right-3"><ArrowPathIcon className="w-4 h-4" /></button>
             <div className='mt-1 flex flex-row items-start gap-x-2 lg:w-inherit relative box-border w-full'>
               {uploadedFile &&  (
                   fileExt === 'jpeg' || fileExt === 'png' || fileExt === 'jpg' 
@@ -269,9 +257,9 @@ const FileUpload = ({hasError, returnFileDetails, fieldLabel, requiredField, pre
                       <p className='text-sm font-space font-medium text-at-dark-gray dark:text-slate-200'>.{preAddedFileName.split('.').pop()}</p>
                   </a>
               )}
-                {fileName && fileName !== '' && 
+                {fileName && 
                 <p className="text-xs px-4 text-at-dark-gray dark:text-slate-200 w-full">
-                    Size: {fileSize.toLocaleString()} MB<br />
+                    Size: {fileSize?.toLocaleString()} MB<br />
                     File name: <span className='font-medium'>{fileName.substring(0,25)}{fileName.length > 25 && '...'} </span>
                 </p> }
             </div>
